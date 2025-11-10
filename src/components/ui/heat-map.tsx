@@ -1,9 +1,6 @@
-// src/components/ui/bubble-map.tsx
 "use client";
-import { MapContainer, TileLayer, Circle, Popup } from 'react-leaflet';
-import { RegionalPerformance } from '@/src/types/marketing';
-import { cityCoordinates } from '@/src/utils/cityCoordinates';
-import 'leaflet/dist/leaflet.css';
+
+import { RegionalPerformance } from "@/src/types/marketing";
 
 interface HeatMapProps {
   data: RegionalPerformance[];
@@ -12,16 +9,18 @@ interface HeatMapProps {
   height?: number;
 }
 
-export function HeatMap({ 
-  data, 
-  metric, 
-  className = "", 
-  height = 500 
+export function HeatMap({
+  data,
+  metric,
+  className = "",
+  height = 500
 }: HeatMapProps) {
   if (!data || data.length === 0) {
     return (
       <div className={`bg-gray-800 rounded-lg p-6 border border-gray-700 ${className}`}>
-        <h3 className="text-lg font-semibold text-white mb-4">Regional Performance Map</h3>
+        <h3 className="text-lg font-semibold text-white mb-4">
+          Regional {metric === 'revenue' ? 'Revenue' : 'Spend'} Heat Map
+        </h3>
         <div className="flex items-center justify-center h-48 text-gray-400">
           No regional data available
         </div>
@@ -29,157 +28,123 @@ export function HeatMap({
     );
   }
 
-  // Function to determine bubble color based on ROAS performance
-  const getColor = (roas: number): string => {
-    return roas > 80 ? '#10B981' :   // High performance - Green
-           roas > 50 ? '#3B82F6' :   // Medium performance - Blue
-                       '#EF4444';    // Low performance - Red
+  // Calculate min and max values for scaling
+  const values = data.map(item => item[metric]);
+  const maxValue = Math.max(...values);
+  const minValue = Math.min(...values);
+
+  // Function to calculate circle size based on value
+  const getCircleSize = (value: number): number => {
+    const minSize = 40;
+    const maxSize = 120;
+    const normalized = (value - minValue) / (maxValue - minValue || 1);
+    return minSize + normalized * (maxSize - minSize);
   };
 
-  // Function to determine bubble size based on metric value
-  const getRadius = (value: number, maxValue: number): number => {
-    const minRadius = 10000; // 10km minimum radius
-    const maxRadius = 200000; // 200km maximum radius
-    
-    // Normalize the value and scale to radius range
-    return minRadius + (value / maxValue) * (maxRadius - minRadius);
+  // Function to get color intensity based on value
+  const getColorIntensity = (value: number): number => {
+    const normalized = (value - minValue) / (maxValue - minValue || 1);
+    return Math.floor(normalized * 100);
   };
 
-  // Filter and map data to include coordinates
-  const mappedData = data
-    .map(item => {
-      const coords = cityCoordinates[item.region];
-      if (!coords) return null;
-      
-      return {
-        ...item,
-        coordinates: coords
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => item !== null);
-
-  if (mappedData.length === 0) {
-    return (
-      <div className={`bg-gray-800 rounded-lg p-6 border border-gray-700 ${className}`}>
-        <h3 className="text-lg font-semibold text-white mb-4">Regional Performance Map</h3>
-        <div className="flex items-center justify-center h-48 text-gray-400">
-          No cities with coordinate data available
-        </div>
-      </div>
-    );
-  }
-
-  const maxValue = Math.max(...mappedData.map(item => item[metric]));
+  const formatMetricValue = (value: number): string => {
+    return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  };
 
   return (
-    <div className={`bg-gray-800 rounded-lg border border-gray-700 overflow-hidden ${className}`}>
-      <div className="p-6 pb-4">
+    <div className={`bg-gray-800 rounded-lg border border-gray-700 ${className}`}>
+      <div className="p-6">
         <h3 className="text-lg font-semibold text-white mb-2">
           Regional {metric === 'revenue' ? 'Revenue' : 'Spend'} Heat Map
         </h3>
-        <p className="text-sm text-gray-400 mb-4">
-          Bubble size represents {metric === 'revenue' ? 'revenue' : 'spend'} amount. Color indicates ROAS performance.
+        <p className="text-sm text-gray-400 mb-6">
+          Bubble size represents {metric === 'revenue' ? 'revenue' : 'spend'} amount
         </p>
-      </div>
-      
-      <div style={{ height: `${height}px` }} className="relative">
-        <MapContainer 
-          center={[30, 0]} 
-          zoom={2} 
-          style={{ height: '100%', width: '100%' }}
-          className="rounded-b-lg"
-        >
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          />
-          
-          {mappedData.map((item, index) => (
-            <Circle
-              key={index}
-              center={[item.coordinates.lat, item.coordinates.lng]}
-              radius={getRadius(item[metric], maxValue)}
-              pathOptions={{
-                fillColor: getColor(item.roas),
-                color: getColor(item.roas),
-                fillOpacity: 0.6,
-                weight: 2,
-              }}
-            >
-              <Popup>
-                <div className="p-3 min-w-[200px]">
-                  <h4 className="font-semibold text-gray-900 text-lg mb-2">
-                    {item.region}, {item.country}
-                  </h4>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Revenue:</span>
-                      <span className="font-medium text-green-600">
-                        ${item.revenue.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Spend:</span>
-                      <span className="font-medium text-blue-600">
-                        ${item.spend.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Impressions:</span>
-                      <span className="font-medium">
-                        {item.impressions.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Conversions:</span>
-                      <span className="font-medium">
-                        {item.conversions.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">CTR:</span>
-                      <span className="font-medium">
-                        {item.ctr.toFixed(2)}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">ROAS:</span>
-                      <span className={`font-medium ${
-                        item.roas > 80 ? 'text-green-600' : 
-                        item.roas > 50 ? 'text-blue-600' : 
-                        'text-red-600'
-                      }`}>
-                        {item.roas.toFixed(1)}x
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </Popup>
-            </Circle>
-          ))}
-        </MapContainer>
 
-        {/* Legend */}
-        <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg p-4 shadow-lg border border-gray-200">
-          <h4 className="font-semibold text-gray-900 text-sm mb-2">ROAS Performance</h4>
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 rounded-full bg-green-500"></div>
-              <span className="text-xs text-gray-700">High (ROAS &gt; 80)</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 rounded-full bg-blue-500"></div>
-              <span className="text-xs text-gray-700">Medium (ROAS 50-80)</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 rounded-full bg-red-500"></div>
-              <span className="text-xs text-gray-700">Low (ROAS &lt; 50)</span>
-            </div>
+        <div className="flex gap-8 items-start">
+          {/* Bubble Chart */}
+          <div className="flex-1 flex flex-wrap gap-6 justify-center items-center min-h-[300px]">
+            {data.map((region) => (
+              <div key={region.region} className="flex flex-col items-center">
+                <div
+                  className="rounded-full flex flex-col items-center justify-center text-white font-semibold shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer"
+                  style={{
+                    width: `${getCircleSize(region[metric])}px`,
+                    height: `${getCircleSize(region[metric])}px`,
+                    backgroundColor: metric === 'revenue'
+                      ? `rgba(34, 197, 94, ${getColorIntensity(region[metric]) / 100 + 0.3})`
+                      : `rgba(59, 130, 246, ${getColorIntensity(region[metric]) / 100 + 0.3})`,
+                    border: `3px solid ${metric === 'revenue'
+                        ? `rgba(21, 128, 61, ${getColorIntensity(region[metric]) / 100 + 0.5})`
+                        : `rgba(37, 99, 235, ${getColorIntensity(region[metric]) / 100 + 0.5})`
+                      }`
+                  }}
+                  title={`${region.region}: ${formatMetricValue(region[metric])}`}
+                >
+                  <span className="text-sm font-bold drop-shadow-sm text-center px-2">
+                    {region.region}
+                  </span>
+                  <span className="text-xs mt-1 drop-shadow-sm bg-white/20 px-2 py-1 rounded-full">
+                    {formatMetricValue(region[metric])}
+                  </span>
+                </div>
+                <div className="mt-2 text-xs text-gray-400 text-center">
+                  {region.country}
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="mt-3 pt-2 border-t border-gray-200">
-            <p className="text-xs text-gray-600">
-              Bubble size represents {metric === 'revenue' ? 'revenue' : 'spend'} amount
-            </p>
+
+          {/* Legend */}
+          <div className="w-48 bg-gray-700/50 rounded-lg p-4 border border-gray-600">
+            <h4 className="font-semibold text-white mb-3 text-center">Bubble Size</h4>
+            <div className="space-y-4">
+              <div className="flex flex-col items-center">
+                <div
+                  className="rounded-full border-2 flex items-center justify-center text-xs font-medium text-white"
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    backgroundColor: metric === 'revenue' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(59, 130, 246, 0.3)',
+                    borderColor: metric === 'revenue' ? 'rgb(21, 128, 61)' : 'rgb(37, 99, 235)'
+                  }}
+                >
+                  Small
+                </div>
+                <span className="text-xs text-gray-300 mt-1">
+                  {formatMetricValue(minValue)}
+                </span>
+              </div>
+              <div className="flex flex-col items-center">
+                <div
+                  className="rounded-full border-2 flex items-center justify-center text-xs font-medium text-white"
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    backgroundColor: metric === 'revenue' ? 'rgba(34, 197, 94, 0.5)' : 'rgba(59, 130, 246, 0.5)',
+                    borderColor: metric === 'revenue' ? 'rgb(21, 128, 61)' : 'rgb(37, 99, 235)'
+                  }}
+                >
+                  Medium
+                </div>
+              </div>
+              <div className="flex flex-col items-center">
+                <div
+                  className="rounded-full border-2 flex items-center justify-center text-xs font-medium text-white"
+                  style={{
+                    width: '120px',
+                    height: '120px',
+                    backgroundColor: metric === 'revenue' ? 'rgba(34, 197, 94, 0.7)' : 'rgba(59, 130, 246, 0.7)',
+                    borderColor: metric === 'revenue' ? 'rgb(21, 128, 61)' : 'rgb(37, 99, 235)'
+                  }}
+                >
+                  Large
+                </div>
+                <span className="text-xs text-gray-300 mt-1">
+                  {formatMetricValue(maxValue)}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

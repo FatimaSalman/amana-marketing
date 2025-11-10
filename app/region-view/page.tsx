@@ -10,7 +10,6 @@ import { BarChart } from '@/src/components/ui/bar-chart';
 import { HeatMap } from '@/src/components/ui/heat-map';
 import { Table } from '@/src/components/ui/table';
 import { MapPin, DollarSign, TrendingUp, Users, Target, Globe, Filter } from 'lucide-react';
-import dynamic from 'next/dynamic';
 
 export default function RegionView() {
   const [marketingData, setMarketingData] = useState<MarketingData | null>(null);
@@ -64,6 +63,17 @@ export default function RegionView() {
     return Object.values(regionMap);
   }, [marketingData?.campaigns]);
 
+  // Calculate totals for stats
+  const totalRevenue = regionalData.reduce((sum, region) => sum + region.revenue, 0);
+  const totalSpend = regionalData.reduce((sum, region) => sum + region.spend, 0);
+  const totalRegions = regionalData.length;
+
+  // Find top region by revenue
+  const topRegion = regionalData.reduce((prev, current) =>
+    (prev.revenue > current.revenue) ? prev : current,
+    { revenue: 0, region: 'N/A' } as RegionalPerformance
+  );
+
   // Top performing regions
   const topRegions = useMemo(() => {
     return regionalData
@@ -95,9 +105,14 @@ export default function RegionView() {
                   Error loading data: {error}
                 </div>
               ) : (
-                <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold">
-                  Regional Performance
-                </h1>
+                <>
+                  <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
+                    Regional Performance
+                  </h1>
+                  <div className="bg-blue-600 text-white inline-block px-4 py-2 rounded-full font-semibold text-sm">
+                    TOTAL REGIONS {totalRegions}
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -109,36 +124,36 @@ export default function RegionView() {
               {/* Regional Overview Metrics */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
                 <CardMetric
-                  title="Total Regions"
-                  value={regionalData.length}
+                  title="TOTAL REGIONS"
+                  value={totalRegions}
                   icon={<Globe className="h-5 w-5" />}
                 />
 
                 <CardMetric
-                  title="Total Regional Revenue"
-                  value={`$${regionalData.reduce((sum, region) => sum + region.revenue, 0).toLocaleString()}`}
+                  title="TOTAL REVENUE"
+                  value={`$${totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
                   icon={<DollarSign className="h-5 w-5" />}
                 />
 
                 <CardMetric
-                  title="Total Regional Spend"
-                  value={`$${regionalData.reduce((sum, region) => sum + region.spend, 0).toLocaleString()}`}
+                  title="TOTAL SPEND"
+                  value={`$${totalSpend.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
                   icon={<TrendingUp className="h-5 w-5" />}
                 />
 
                 <CardMetric
-                  title="Avg. Regional ROAS"
-                  value={`${(regionalData.reduce((sum, region) => sum + region.roas, 0) / regionalData.length).toFixed(1)}x`}
+                  title="TOP REGION"
+                  value={topRegion.region}
                   icon={<Target className="h-5 w-5" />}
                 />
               </div>
 
-              {/* Bubble Map Section */}
+              {/* Heat Map Section */}
               <div className="mb-6 sm:mb-8">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-white flex items-center">
                     <MapPin className="h-5 w-5 text-blue-400 mr-2" />
-                    Regional Heat Map
+                    {selectedMetric === 'revenue' ? 'Revenue by Region' : 'Spend by Region'}
                   </h2>
                   <div className="flex items-center space-x-2">
                     <Filter className="h-4 w-4 text-gray-400" />
@@ -157,7 +172,6 @@ export default function RegionView() {
                   data={regionalData}
                   metric={selectedMetric}
                   height={500}
-                  className="mb-6"
                 />
               </div>
 
@@ -299,8 +313,8 @@ export default function RegionView() {
                     sortType: 'number',
                     render: (value) => (
                       <span className={`font-medium ${value > 50 ? 'text-green-400' :
-                          value > 20 ? 'text-blue-400' :
-                            'text-yellow-400'
+                        value > 20 ? 'text-blue-400' :
+                          'text-yellow-400'
                         }`}>
                         {value.toFixed(1)}x
                       </span>
