@@ -94,6 +94,7 @@ export interface Creative {
 
 export interface Timeline {
   start_date: string;
+  end_date: string;
   created_date: string;
   last_updated: string;
 }
